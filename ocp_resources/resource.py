@@ -23,6 +23,7 @@ from ocp_resources.constants import (
     NOT_FOUND_ERROR_EXCEPTION_DICT,
     PROTOCOL_ERROR_EXCEPTION_DICT,
     TIMEOUT_4MINUTES,
+    TIMEOUT_60SEC,
 )
 from ocp_resources.logger import get_logger
 from ocp_resources.utils import TimeoutExpiredError, TimeoutSampler
@@ -495,7 +496,7 @@ class Resource:
 
         return kwargs
 
-    def full_api(self, **kwargs):
+    def full_api(self, timeout_seconds=TIMEOUT_60SEC, **kwargs):
         """
         Get resource API
 
@@ -517,7 +518,10 @@ class Resource:
         kwargs = self._prepare_singular_name_kwargs(**kwargs)
 
         return self.client.resources.get(
-            api_version=self.api_version, kind=self.kind, **kwargs
+            api_version=self.api_version,
+            kind=self.kind,
+            timeout_seconds=timeout_seconds,
+            **kwargs,
         )
 
     @property
@@ -612,6 +616,8 @@ class Resource:
             func=self.api.get,
             field_selector=f"metadata.name=={self.name}",
             namespace=self.namespace,
+            timeout_seconds=timeout,
+            dyn_client=self.client,
         )
         current_status = None
         try:
@@ -764,7 +770,7 @@ class Resource:
         return Resource.retry_cluster_exceptions(func=_get)
 
     @property
-    def instance(self):
+    def instance(self, timeout=TIMEOUT_60SEC):
         """
         Get resource instance
 
@@ -772,10 +778,11 @@ class Resource:
             openshift.dynamic.client.ResourceInstance
         """
 
-        def _instance():
-            return self.api.get(name=self.name)
-
-        return self.retry_cluster_exceptions(func=_instance)
+        return self.retry_cluster_exceptions(
+            func=lambda: self.api.get(
+                dyn_client=self.client, name=self.name, timeout_seconds=timeout
+            )
+        )
 
     @property
     def labels(self):
@@ -809,6 +816,8 @@ class Resource:
             func=self.api.get,
             field_selector=f"metadata.name=={self.name}",
             namespace=self.namespace,
+            timeout_seconds=timeout,
+            dyn_client=self.client,
         )
         for sample in samples:
             if (
@@ -926,14 +935,19 @@ class NamespacedResource(Resource):
                 )
 
     @property
-    def instance(self):
+    def instance(self, timeout=TIMEOUT_60SEC):
         """
         Get resource instance
 
         Returns:
             openshift.dynamic.client.ResourceInstance
         """
-        return self.api.get(name=self.name, namespace=self.namespace)
+        return self.api.get(
+            dyn_client=self.client,
+            name=self.name,
+            namespace=self.namespace,
+            timeout_seconds=timeout,
+        )
 
     def _base_body(self):
         res = super(NamespacedResource, self)._base_body()

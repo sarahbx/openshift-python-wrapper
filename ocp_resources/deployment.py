@@ -49,6 +49,8 @@ class Deployment(NamespacedResource):
             exceptions_dict=PROTOCOL_ERROR_EXCEPTION_DICT,
             func=self.api.get,
             field_selector=f"metadata.name=={self.name}",
+            timeout_seconds=timeout,
+            dyn_client=self.client,
         )
         for sample in samples:
             if sample.items:

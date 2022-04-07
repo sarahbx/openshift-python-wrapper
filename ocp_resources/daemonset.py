@@ -34,6 +34,8 @@ class DaemonSet(NamespacedResource):
             func=self.api.get,
             field_selector=f"metadata.name=={self.name}",
             namespace=self.namespace,
+            timeout_seconds=timeout,
+            dyn_client=self.client,
         )
         for sample in samples:
             if sample.items:
